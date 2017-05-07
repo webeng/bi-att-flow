@@ -182,7 +182,7 @@ class Model(object):
                 # q_emb = tf.nn.embedding_lookup(word_emb_mat, self.q)  # [N, JQ, d]
                 self.tensor_dict['x_emb'] = x_emb
                 # self.tensor_dict['q_emb'] = q_emb
-
+            print(self.u_logits.get_shape())
             p0 = tf.concat(3, [self.u_logits, x_emb])
             # print(p0.get_shape())
             p0 = tf.reshape(p0, (N, 1, -1, 130))
