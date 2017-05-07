@@ -9,6 +9,12 @@ from collections import Counter
 from tqdm import tqdm
 
 from squad.utils import get_word_span, get_word_idx, process_tokens
+import pprint
+import numpy as np
+from nltk.stem.porter import PorterStemmer
+
+
+pprint = pprint.PrettyPrinter(indent=4).pprint
 
 
 def main():
@@ -108,6 +114,31 @@ def get_word2vec(args, word_counter):
     return word2vec_dict
 
 
+""" Find exact match between context (xi) and query (qi)
+    Attributes:
+        xi : <list> list of words in the context
+        qi : <list> list of words in the question
+    Returns:
+        exact_match: <list> [#num_words, 3]
+"""
+def get_exact_match(xi, qi):
+
+    ps = PorterStemmer()
+    exact_math= np.zeros(shape=(len(xi), 3))
+
+    for i, xii in enumerate(xi):
+        xii_stem = ps.stem(xii)
+        for qii in qi:
+            qii_stem = ps.stem(qii)
+            if xii == qii:
+                exact_math[i][0] = 1
+            if xii.lower() == qii.lower():
+                exact_math[i][1] = 1
+            if xii_stem == qii_stem:
+                exact_math[i][2] = 1
+#    print(exact_math, exact_math.shape)
+    return exact_math.tolist()
+
 def prepro_single_question_with_context(context, question):
 
     import nltk
@@ -134,6 +165,10 @@ def prepro_single_question_with_context(context, question):
     context = context.replace("''", '" ')
     context = context.replace("``", '" ')
     xi = word_tokenize(context)
+
+    # Find exact match between context (xi) and query (qi)
+    x_exact_match = get_exact_match(xi, qi)
+
     # Transform list of words into list of characters
     cxi = [list(xij) for xij in xi]
 
@@ -150,6 +185,7 @@ def prepro_single_question_with_context(context, question):
         'answerss': answerss,   # raw answers
         '*p': rx,                # *x Useless?
         'x': [[xi]],
+        'x_exact_match': [[x_exact_match]],
         'cx': [[cxi]],
         'p': [context]
     }
@@ -184,6 +220,7 @@ def prepro_each(args, data_type, start_ratio=0.0, stop_ratio=1.0, out_name="defa
     x, cx = [], []
     answerss = []
     p = []
+    x_exact_matches = []
     word_counter, char_counter, lower_word_counter = Counter(), Counter(), Counter()
     start_ai = int(round(len(source_data['data']) * start_ratio))
     stop_ai = int(round(len(source_data['data']) * stop_ratio))
@@ -204,6 +241,7 @@ def prepro_each(args, data_type, start_ratio=0.0, stop_ratio=1.0, out_name="defa
             # I like carrots. Very much. => ["I", "like", "carrots", ".", "Very", "much", "."]
             xi = list(map(word_tokenize, sent_tokenize(context)))
             xi = [process_tokens(tokens) for tokens in xi]  # Remove non-ascii characters. TODO: Encode to utf-8
+
             # Transform list of words into list of characters
             cxi = [[list(xijk) for xijk in xij] for xij in xi]
             # Append to buckets
@@ -230,6 +268,11 @@ def prepro_each(args, data_type, start_ratio=0.0, stop_ratio=1.0, out_name="defa
                 cqi = [list(qij) for qij in qi]
                 yi = []
                 cyi = []
+
+                # Check exact matches between context (xi) and query (qi)
+                # print(qi)
+                x_exact_match = get_exact_match(xi[0], qi)
+
                 # Iterate through answers
                 answers = []
                 for answer in qa['answers']:
@@ -281,6 +324,7 @@ def prepro_each(args, data_type, start_ratio=0.0, stop_ratio=1.0, out_name="defa
                 ids.append(qa['id'])
                 idxs.append(len(idxs))
                 answerss.append(answers)
+                x_exact_matches.append(x_exact_match)
 
             if args.debug:
                 break
@@ -302,6 +346,7 @@ def prepro_each(args, data_type, start_ratio=0.0, stop_ratio=1.0, out_name="defa
         'idxs': idxs,           # Useless??
         'ids': ids,             # question ids
         'answerss': answerss,   # raw answers
+        'x_exact_matches': x_exact_matches,  # raw answers
         '*p': rx                # *x Useless?
     }
 

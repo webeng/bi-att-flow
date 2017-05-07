@@ -37,6 +37,7 @@ class Model(object):
         self.cx = tf.placeholder('int32', [N, None, None, W], name='cx')
         self.x_mask = tf.placeholder('bool', [N, None, None], name='x_mask')
         self.q = tf.placeholder('int32', [N, None], name='q')
+        self.x_exact_matches = tf.placeholder('int32', [N, None], name='x_exact_matches')
         self.cq = tf.placeholder('int32', [N, None, W], name='cq')
         self.q_mask = tf.placeholder('bool', [N, None], name='q_mask')
         self.y = tf.placeholder('bool', [N, None, None], name='y')
@@ -50,6 +51,9 @@ class Model(object):
         # Forward outputs / loss inputs
         self.logits = None
         self.yp = None
+        self.u_logits = None
+        # self.u_a = None
+        # self.h_a = None
         self.var_list = None
 
         # Loss outputs
@@ -158,25 +162,86 @@ class Model(object):
                 first_cell = AttentionCell(cell, u, mask=q_mask, mapper='sim',
                                            input_keep_prob=self.config.input_keep_prob, is_train=self.is_train)
             else:
-                p0 = attention_layer(config, self.is_train, h, u, h_mask=self.x_mask, u_mask=self.q_mask, scope="p0", tensor_dict=self.tensor_dict)
+                #p0, self.u_logits = attention_layer(config, self.is_train, h, u, h_mask=self.x_mask, u_mask=self.q_mask, scope="p0", tensor_dict=self.tensor_dict)
+                self.u_logits = attention_layer(config, self.is_train, h, u, h_mask=self.x_mask, u_mask=self.q_mask, scope="p0", tensor_dict=self.tensor_dict)
                 first_cell = d_cell
+                self.tensor_dict['u_logits'] = self.u_logits
+             # u_logits = S
 
+            # if config.use_word_emb:
+            #     with tf.variable_scope("emb_var"), tf.device("/cpu:0"):
+            #         if config.mode == 'train':
+            #             word_emb_mat = tf.get_variable("word_emb_mat", dtype='float', shape=[VW, dw], initializer=get_initializer(config.emb_mat))
+            #         else:
+            #             word_emb_mat = tf.get_variable("word_emb_mat", shape=[VW, dw], dtype='float')
+            #         if config.use_glove_for_unk:
+            #             word_emb_mat = tf.concat(0, [word_emb_mat, self.new_emb_mat])
+
+            with tf.name_scope("x_word"):
+                x_emb = tf.nn.embedding_lookup(word_emb_mat, self.x)  # [N, M, JX, d]
+                # q_emb = tf.nn.embedding_lookup(word_emb_mat, self.q)  # [N, JQ, d]
+                self.tensor_dict['x_emb'] = x_emb
+                # self.tensor_dict['q_emb'] = q_emb
+
+            p0 = tf.concat(3, [self.u_logits, x_emb])
+            # print(p0.get_shape())
+            p0 = tf.reshape(p0, (N, 1, -1, 130))
+            # print(p0.get_shape())
+
+            # print(pi.get_shape())
+            # p0 = tf.slice(p0, begin=[0, 0, 0, 1], size=[60, 1, 400, 130])
+            # print(pi)
+            # tf.slice
+
+            # tf.reduced_shape(self.u_logits, )
+
+            # print(pi)
+            # print(pi_slice.shape)
+
+            #(fw_g0, bw_g0), _ = bidirectional_dynamic_rnn(first_cell, first_cell, p0, x_len, dtype='float', scope='g0')  # [N, M, JX, 2d]
             (fw_g0, bw_g0), _ = bidirectional_dynamic_rnn(first_cell, first_cell, p0, x_len, dtype='float', scope='g0')  # [N, M, JX, 2d]
             g0 = tf.concat(3, [fw_g0, bw_g0])
+            # print(g0)
+
             (fw_g1, bw_g1), _ = bidirectional_dynamic_rnn(first_cell, first_cell, g0, x_len, dtype='float', scope='g1')  # [N, M, JX, 2d]
             g1 = tf.concat(3, [fw_g1, bw_g1])
+            g1 = tf.add(g0, g1)
 
-            logits = get_logits([g1, p0], d, True, wd=config.wd, input_keep_prob=config.input_keep_prob,
-                                mask=self.x_mask, is_train=self.is_train, func=config.answer_func, scope='logits1')
-            a1i = softsel(tf.reshape(g1, [N, M * JX, 2 * d]), tf.reshape(logits, [N, M * JX]))
+            (fw_g2, bw_g2), _ = bidirectional_dynamic_rnn(first_cell, first_cell, g1, x_len, dtype='float', scope='g2')  # [N, M, JX, 2d]
+            g2 = tf.concat(3, [fw_g2, bw_g2])
+            g2 = tf.add(g2, g1)
+
+            logits = get_logits(
+                args=[g2, p0],
+                size=d,
+                bias=True,
+                wd=config.wd,
+                input_keep_prob=config.input_keep_prob,
+                mask=self.x_mask,
+                is_train=self.is_train,
+                func=config.answer_func,
+                scope='logits1'
+            )
+
+            print(logits)
+            a1i = softsel(tf.reshape(g2, [N, M * JX, 2 * d]), tf.reshape(logits, [N, M * JX]))
             a1i = tf.tile(tf.expand_dims(tf.expand_dims(a1i, 1), 1), [1, M, JX, 1])
 
-            (fw_g2, bw_g2), _ = bidirectional_dynamic_rnn(d_cell, d_cell, tf.concat(3, [p0, g1, a1i, g1 * a1i]),
-                                                          x_len, dtype='float', scope='g2')  # [N, M, JX, 2d]
-            g2 = tf.concat(3, [fw_g2, bw_g2])
-            logits2 = get_logits([g2, p0], d, True, wd=config.wd, input_keep_prob=config.input_keep_prob,
-                                 mask=self.x_mask,
-                                 is_train=self.is_train, func=config.answer_func, scope='logits2')
+            (fw_g3, bw_g3), _ = bidirectional_dynamic_rnn(d_cell, d_cell, tf.concat(3, [p0, g2, a1i, g2 * a1i]),
+                                                          x_len, dtype='float', scope='g3')  # [N, M, JX, 2d]
+            g3 = tf.concat(3, [fw_g3, bw_g3])
+
+            logits2 = get_logits(
+                args=[g3, p0],
+                size=d,
+                bias=True,
+                wd=config.wd,
+                input_keep_prob=config.input_keep_prob,
+                mask=self.x_mask,
+                is_train=self.is_train,
+                func=config.answer_func,
+                scope='logits2'
+            )
 
             flat_logits = tf.reshape(logits, [-1, M * JX])
             flat_yp = tf.nn.softmax(flat_logits)  # [-1, M*JX]
@@ -187,6 +252,7 @@ class Model(object):
 
             self.tensor_dict['g1'] = g1
             self.tensor_dict['g2'] = g2
+            self.tensor_dict['g3'] = g3
 
             self.logits = flat_logits
             self.logits2 = flat_logits2
@@ -288,6 +354,8 @@ class Model(object):
         feed_dict[self.cq] = cq
         feed_dict[self.q_mask] = q_mask
         feed_dict[self.is_train] = is_train
+        feed_dict[self.x_exact_matches] = batch.data['x_exact_matches']
+
         if config.use_glove_for_unk:
             feed_dict[self.new_emb_mat] = batch.shared['new_emb_mat']
 
@@ -393,6 +461,7 @@ def bi_attention(config, is_train, h, u, h_mask=None, u_mask=None, scope=None, t
 
         u_logits = get_logits([h_aug, u_aug], None, True, wd=config.wd, mask=hu_mask,
                               is_train=is_train, func=config.logit_func, scope='u_logits')  # [N, M, JX, JQ]
+        return tf.nn.softmax(u_logits)
         u_a = softsel(u_aug, u_logits)  # [N, M, JX, d]
         h_a = softsel(h, tf.reduce_max(u_logits, 3))  # [N, M, d]
         h_a = tf.tile(tf.expand_dims(h_a, 2), [1, 1, JX, 1])
@@ -406,7 +475,7 @@ def bi_attention(config, is_train, h, u, h_mask=None, u_mask=None, scope=None, t
             for var in variables:
                 tensor_dict[var.name] = var
 
-        return u_a, h_a
+        return u_a, h_a, u_logits
 
 
 def attention_layer(config, is_train, h, u, h_mask=None, u_mask=None, scope=None, tensor_dict=None):
@@ -414,12 +483,15 @@ def attention_layer(config, is_train, h, u, h_mask=None, u_mask=None, scope=None
         JX = tf.shape(h)[2]
         M = tf.shape(h)[1]
         JQ = tf.shape(u)[1]
+        u_logits = None
         if config.q2c_att or config.c2q_att:
-            u_a, h_a = bi_attention(config, is_train, h, u, h_mask=h_mask, u_mask=u_mask, tensor_dict=tensor_dict)
+            #u_a, h_a, u_logits = bi_attention(config, is_train, h, u, h_mask=h_mask, u_mask=u_mask, tensor_dict=tensor_dict)
+            return bi_attention(config, is_train, h, u, h_mask=h_mask, u_mask=u_mask, tensor_dict=tensor_dict)
         if not config.c2q_att:
             u_a = tf.tile(tf.expand_dims(tf.expand_dims(tf.reduce_mean(u, 1), 1), 1), [1, M, JX, 1])
         if config.q2c_att:
             p0 = tf.concat(3, [h, u_a, h * u_a, h * h_a])
         else:
             p0 = tf.concat(3, [h, u_a, h * u_a])
-        return p0
+
+        return p0, u_logits

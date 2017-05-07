@@ -145,7 +145,7 @@ python -m basic.cli --num_gpus 3 --batch_size 20
 ## 4. Demo Server
 Run demo server to explore a single trained model. Firstly, we need to preprocess the data.
 ```
-python -m squad.prepro --mode dev --single_path /path-to/dev-v1.1.json --target_dir inter_single --glove_dir /path-to/glove/
+python -m squad.prepro --mode dev --source_dir /path-to/dev-v1.1.json --target_dir inter_single --glove_dir /path-to/glove/
 ```
 This will create a folder called `inter_single` in the current path. Before executing the next command, make sure your `PYTHONPATH` has the current project folder on it. You can set the path by `export PYTHONPATH='/path-to/bi-att-flow'`.
 Then execute the following command to run the server: 
