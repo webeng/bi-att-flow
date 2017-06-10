@@ -12,6 +12,10 @@ from squad.utils import get_word_span, get_word_idx, process_tokens
 import pprint
 import numpy as np
 from nltk.stem.porter import PorterStemmer
+# import cPickle as pickle
+# import _pickle as pickle
+# import pickle
+import sys
 
 
 pprint = pprint.PrettyPrinter(indent=4).pprint
@@ -75,6 +79,9 @@ def prepro(args):
         prepro_each(args, 'dev', out_name='dev')
     elif args.mode == 'dev_short':
         prepro_each(args, 'dev_short', 0.0, 0.05, out_name='dev_short')
+    elif args.mode == 'specifiedby':
+        prepro_each(args, 'specifiedby', 0.0, 0.75, out_name='specifiedby_train')
+        prepro_each(args, 'specifiedby', 0.76, 1.0, out_name='specifiedby_dev')
     elif args.mode == 'single':
         assert len(args.single_path) > 0
         prepro_each(args, "NULL", out_name="single", in_path=args.single_path)
@@ -124,7 +131,7 @@ def get_word2vec(args, word_counter):
 def get_exact_match(xi, qi):
 
     ps = PorterStemmer()
-    exact_math= np.zeros(shape=(len(xi), 3))
+    exact_math = np.zeros(shape=(len(xi), 3))
 
     for i, xii in enumerate(xi):
         xii_stem = ps.stem(xii)
@@ -167,7 +174,11 @@ def prepro_single_question_with_context(context, question):
     xi = word_tokenize(context)
 
     # Find exact match between context (xi) and query (qi)
-    x_exact_match = get_exact_match(xi, qi)
+    try:
+        x_exact_match = get_exact_match(xi, qi)
+    except IndexError:
+        print("IndexError:", sys.exc_info()[0])
+        print(xi)
 
     # Transform list of words into list of characters
     cxi = [list(xij) for xij in xi]
@@ -213,7 +224,10 @@ def prepro_each(args, data_type, start_ratio=0.0, stop_ratio=1.0, out_name="defa
         sent_tokenize = lambda para: [para]
 
     source_path = in_path or os.path.join(args.source_dir, "{}-v1.1.json".format(data_type))
-    source_data = json.load(open(source_path, 'r'))
+    # source_data = json.loads(open(source_path, 'r'))
+    # source_data = pickle.load(open(source_path, 'rb'), encoding='latin1')
+    with open(source_path, 'r') as f:
+        source_data = json.loads(f.read())
 
     q, cq, y, rx, rcx, ids, idxs = [], [], [], [], [], [], []
     cy = []
@@ -271,7 +285,11 @@ def prepro_each(args, data_type, start_ratio=0.0, stop_ratio=1.0, out_name="defa
 
                 # Check exact matches between context (xi) and query (qi)
                 # print(qi)
-                x_exact_match = get_exact_match(xi[0], qi)
+                try:
+                    x_exact_match = get_exact_match(xi[0], qi)
+                except IndexError:
+                    print("IndexError:", sys.exc_info()[0])
+                    print(xi)
 
                 # Iterate through answers
                 answers = []
@@ -285,6 +303,7 @@ def prepro_each(args, data_type, start_ratio=0.0, stop_ratio=1.0, out_name="defa
                     # Get word the word start and end instead of char start and end.
                     # I'm not sure why is this useful. It would be for CNN
                     # TODO : put some function that gives word_start, word_stop here
+                    # print(answer_text, answer_start, answer_stop)
                     yi0, yi1 = get_word_span(context, xi, answer_start, answer_stop)
                     # yi0 = answer['answer_word_start'] or [0, 0]
                     # yi1 = answer['answer_word_stop'] or [0, 1]
@@ -298,7 +317,19 @@ def prepro_each(args, data_type, start_ratio=0.0, stop_ratio=1.0, out_name="defa
 
                     cyi0 = answer_start - i0
                     cyi1 = answer_stop - i1 - 1
+                    # cyi0 = cyi0.strip()
+                    # cyi1 = cyi1.strip()
                     # print(answer_text, w0[cyi0:], w1[:cyi1+1])
+                    # pprint(context)
+                    # pprint(qa)
+                    # print('----------------')
+                    # pprint(answer)
+                    # print(qa)
+                    # print(answer)
+                    # print(answer_text[0], w0[cyi0], answer_text, w0)
+                    # print(answer, context[answer_start:answer_stop], context[answer_start-100:answer_stop+100])
+                    # print(answer_text, answer_start, answer_stop, cyi1, type(cyi1), len(answer_text), w1, qa['question'])
+                    # print("---")
                     assert answer_text[0] == w0[cyi0], (answer_text, w0, cyi0)
                     assert answer_text[-1] == w1[cyi1]
                     assert cyi0 < 32, (answer_text, w0)
@@ -374,4 +405,5 @@ if __name__ == "__main__":
     # context = 'Carrots are very evil creatures. I know a lot of creatures like carrots.'
     # question = 'What are carrots?'
     # # prepro_single_question_with_context('The carrot was born in August.', 'When was the carrot born?')
-    # pprint(prepro_single_question_with_context(context, question))
+    # pprint(prepro_single_question_with_context(context, question)['x_exact_match'])
+    # pprint(np.array(prepro_single_question_with_context(context, question)['x_exact_match']).shape)

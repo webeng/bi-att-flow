@@ -24,12 +24,22 @@ jQuery(document).ready(function($) {
 	// Load contexts and questions from layout
 	var contexts = jQuery.parseJSON($('#contexts_json').val());
 	var contexts_questions = jQuery.parseJSON($('#context_questions_json').val());
+	var contexts_questions_answerss = jQuery.parseJSON($('#context_questions_answerss_json').val());
 	console.log(contexts_questions);
+	console.log(contexts_questions_answerss);
 	console.log(contexts)	
 
 	// Set default paramenters
-	$('#context').text(contexts[0][0]);
-	question = contexts_questions['0']['0'][getRandomInt(0,contexts_questions['0']['0'].length)]
+	var article_idx = Object.keys(contexts_questions)[0];
+	// var paragraph_idx = Object.keys(contexts_questions)[0];
+	var paragraph_idx = Object.keys(contexts_questions[article_idx])[0];
+	// var paragraph_idx = '0';
+
+	$('#context').text(contexts[article_idx][paragraph_idx]);
+
+	var rand_int = getRandomInt(0,contexts_questions[article_idx][paragraph_idx].length - 1);
+	question = contexts_questions[article_idx][paragraph_idx][rand_int]
+	// console.log(question);
 	$('#question').prop('value', question.join(' '));
 
 	// Load new context when select changes
@@ -37,7 +47,12 @@ jQuery(document).ready(function($) {
 		article_idx = $(this).find("option:selected").data('article-idx');
 		paragraph_idx = $(this).find("option:selected").data('paragraph-idx');
 		$('#context').text(contexts[article_idx][paragraph_idx]);
-		question = contexts_questions[article_idx][paragraph_idx][getRandomInt(0,contexts_questions[article_idx][paragraph_idx].length)]
+		
+		console.log(article_idx + ' ' + paragraph_idx + ' ' + rand_int);
+
+		rand_int = getRandomInt(0,contexts_questions[article_idx][paragraph_idx].length - 1);
+
+		question = contexts_questions[article_idx][paragraph_idx][rand_int];
 		$('#question').prop('value', question.join(' '));
 	})
 
@@ -45,8 +60,10 @@ jQuery(document).ready(function($) {
 		event.preventDefault();
 		article_idx = $('#selectArticle').find("option:selected").data('article-idx');
 		paragraph_idx = $('#selectArticle').find("option:selected").data('paragraph-idx');
-
-		question = contexts_questions[article_idx][paragraph_idx][getRandomInt(0,contexts_questions[article_idx][paragraph_idx].length)]
+		
+		rand_int = getRandomInt(0,contexts_questions[article_idx][paragraph_idx].length - 1);
+		console.log(article_idx + ' ' + paragraph_idx + ' ' + rand_int);
+		question = contexts_questions[article_idx][paragraph_idx][rand_int];
 		$('#question').prop('value', question.join(' '));
 	})
 
@@ -74,6 +91,7 @@ jQuery(document).ready(function($) {
 				for (var i = 1; i < data.answers.length; i++) {
 					$('#alternative_answers').append('<li>'+data.answers[i]+' <em>Confidence ('+data.scores[i]+')</em></li>');
 				}
+				$('#correct_answer').text(contexts_questions_answerss[article_idx][paragraph_idx][rand_int]);
 			},
 			error: function(data) {
 				$('#answer').prop('value','Sorry, we could not get an answer.');

@@ -37,7 +37,7 @@ class Model(object):
         self.cx = tf.placeholder('int32', [N, None, None, W], name='cx')
         self.x_mask = tf.placeholder('bool', [N, None, None], name='x_mask')
         self.q = tf.placeholder('int32', [N, None], name='q')
-        self.x_exact_matches = tf.placeholder('int32', [N, None], name='x_exact_matches')
+        self.x_exact_matches = tf.placeholder('float', [N, None, None, 3], name='x_exact_matches')
         self.cq = tf.placeholder('int32', [N, None, W], name='cq')
         self.q_mask = tf.placeholder('bool', [N, None], name='q_mask')
         self.y = tf.placeholder('bool', [N, None, None], name='y')
@@ -182,10 +182,11 @@ class Model(object):
                 # q_emb = tf.nn.embedding_lookup(word_emb_mat, self.q)  # [N, JQ, d]
                 self.tensor_dict['x_emb'] = x_emb
                 # self.tensor_dict['q_emb'] = q_emb
-            print(self.u_logits.get_shape())
-            p0 = tf.concat(3, [self.u_logits, x_emb])
+
+            p0 = tf.concat(3, [self.u_logits, x_emb, self.x_exact_matches])
             # print(p0.get_shape())
-            p0 = tf.reshape(p0, (N, 1, -1, 130))
+            print(self.x_exact_matches.get_shape())
+            p0 = tf.reshape(p0, (N, 1, -1, 133))
             # print(p0.get_shape())
 
             # print(pi.get_shape())
@@ -342,6 +343,7 @@ class Model(object):
 
         x = np.zeros([N, M, JX], dtype='int32')
         cx = np.zeros([N, M, JX, W], dtype='int32')
+        exact_matches = np.zeros([N, M, JX, 3], dtype='int32')
         x_mask = np.zeros([N, M, JX], dtype='bool')
         q = np.zeros([N, JQ], dtype='int32')
         cq = np.zeros([N, JQ, W], dtype='int32')
@@ -354,7 +356,9 @@ class Model(object):
         feed_dict[self.cq] = cq
         feed_dict[self.q_mask] = q_mask
         feed_dict[self.is_train] = is_train
-        feed_dict[self.x_exact_matches] = batch.data['x_exact_matches']
+        # print(batch.data['x_exact_matches'])
+        #feed_dict[self.x_exact_matches] = batch.data['x_exact_matches']
+        feed_dict[self.x_exact_matches] = exact_matches
 
         if config.use_glove_for_unk:
             feed_dict[self.new_emb_mat] = batch.shared['new_emb_mat']

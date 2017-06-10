@@ -10,6 +10,17 @@ from my.utils import short_floats
 
 import pickle
 
+import boto3
+from boto3.session import Session
+
+session = Session(aws_access_key_id='AKIAJJABZMFEQWGHCKFA',
+        aws_secret_access_key='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',
+        region_name='eu-west-1')
+
+s3 = session.resource('s3', use_ssl=False, verify=False)
+bucket = s3.Bucket('jofihu')
+#dir_path = os.path.dirname(os.path.realpath(__file__))
+
 
 class GraphHandler(object):
     def __init__(self, config, model):
@@ -32,10 +43,20 @@ class GraphHandler(object):
     def save(self, sess, global_step=None):
         saver = tf.train.Saver(max_to_keep=self.config.max_to_keep)
         saver.save(sess, self.save_path, global_step=global_step)
+        # Store to S3
+        save_src_path = os.getcwd() + '/' + "/".join(self.save_path.split('/')[0:-1])
+        for file_name in os.listdir(save_src_path):
+            src = save_src_path + '/' + file_name
+            dst = 'save/' + file_name
+            print("src: {} dest: {}".format(src, dst))
+            bucket.upload_file(src, dst)
+            # key = config.env + '/' + store_path + '/batch_' + str(batch_index) + '.json'
+            # bucket.put_object(Body=json.dumps(r.json()), Key=key)
 
     def _load(self, sess):
         config = self.config
-        vars_ = {var.name.split(":")[0]: var for var in tf.all_variables()}
+        #vars_ = {var.name.split(":")[0]: var for var in tf.all_variables()}
+        vars_ = {var.name.split(":")[0]: var for var in tf.global_variables()}
         if config.load_ema:
             ema = self.model.var_ema
             for var in tf.trainable_variables():

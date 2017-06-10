@@ -25,6 +25,19 @@
     <![endif]-->
   </head>
   <body>
+
+  				{% for article_idx in contexts %}
+					<optgroup label="{{titles[article_idx]}}">
+				   {% for paragraph_idx, ctx in contexts[article_idx].items() %}
+				   		<option
+							value="{{ ctx[0:50] }}"
+							data-article-idx="{{article_idx}}"
+							data-paragraph-idx="{{paragraph_idx}}">
+								{{ ctx[0:50] }}
+						</option>
+				   {% endfor %}
+				   </optgroup>
+				{% endfor %}
 	
 	<div class="container" role="main">
 		<div> <!--<div class="jumbotron">-->

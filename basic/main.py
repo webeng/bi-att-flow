@@ -11,8 +11,8 @@ import numpy as np
 
 from basic.evaluator import ForwardEvaluator, MultiGPUF1Evaluator
 from basic.graph_handler import GraphHandler
-# from basic.model import get_multi_gpu_models
-from basic.model_fair import  get_multi_gpu_models
+from basic.model import get_multi_gpu_models
+# from basic.model_fair import get_multi_gpu_models
 from basic.trainer import MultiGPUTrainer
 from basic.read_data import read_data, get_squad_data_filter, update_config
 
@@ -64,14 +64,14 @@ def _config_debug(config):
 
 def _train(config):
     data_filter = get_squad_data_filter(config)
-#    train_data = read_data(config, 'train', config.load, data_filter=data_filter)
-#    dev_data = read_data(config, 'dev', True, data_filter=data_filter)
-
-   # train_data = read_data(config, 'dev', config.load, data_filter=data_filter)
-   # dev_data = read_data(config, 'dev', True, data_filter=data_filter)
-
-    train_data = read_data(config, 'dev_short', config.load, data_filter=data_filter)
-    dev_data = read_data(config, 'dev_short', True, data_filter=data_filter)
+    # train_data = read_data(config, 'train', config.load, data_filter=data_filter)
+    # dev_data = read_data(config, 'dev', True, data_filter=data_filter)
+    train_data = read_data(config, 'specifiedby_train', config.load, data_filter=data_filter)
+    dev_data = read_data(config, 'specifiedby_dev', True, data_filter=data_filter)
+    # train_data = read_data(config, 'dev_short', config.load, data_filter=data_filter)
+    # dev_data = read_data(config, 'dev_short', True, data_filter=data_filter)
+    # train_data = read_data(config, 'dev', config.load, data_filter=data_filter)
+    # dev_data = read_data(config, 'dev', True, data_filter=data_filter)
     update_config(config, [train_data, dev_data])
 
     _config_debug(config)
@@ -127,31 +127,31 @@ def _train(config):
             graph_handler.add_summary(summary, global_step)
 
         # occasional saving
-        if global_step % config.save_period == 0:
-            graph_handler.save(sess, global_step=global_step)
+        # if global_step % config.save_period == 0:
+        #     graph_handler.save(sess, global_step=global_step)
 
         if not config.eval:
             continue
         # Occasional evaluation
-        # if global_step % config.eval_period == 0:
-        #     num_steps = math.ceil(dev_data.num_examples / (config.batch_size * config.num_gpus))
-        #     if 0 < config.val_num_batches < num_steps:
-        #         num_steps = config.val_num_batches
-        #     e_train = evaluator.get_evaluation_from_batches(
-        #         sess, tqdm(train_data.get_multi_batches(config.batch_size, config.num_gpus, num_steps=num_steps), total=num_steps)
-        #     )
-        #     graph_handler.add_summaries(e_train.summaries, global_step)
-        #     e_dev = evaluator.get_evaluation_from_batches(
-        #         sess, tqdm(dev_data.get_multi_batches(config.batch_size, config.num_gpus, num_steps=num_steps), total=num_steps))
-        #     graph_handler.add_summaries(e_dev.summaries, global_step)
+        if global_step % config.eval_period == 0:
+            num_steps = math.ceil(dev_data.num_examples / (config.batch_size * config.num_gpus))
+            if 0 < config.val_num_batches < num_steps:
+                num_steps = config.val_num_batches
+            e_train = evaluator.get_evaluation_from_batches(
+                sess, tqdm(train_data.get_multi_batches(config.batch_size, config.num_gpus, num_steps=num_steps), total=num_steps)
+            )
+            graph_handler.add_summaries(e_train.summaries, global_step)
+            e_dev = evaluator.get_evaluation_from_batches(
+                sess, tqdm(dev_data.get_multi_batches(config.batch_size, config.num_gpus, num_steps=num_steps), total=num_steps))
+            graph_handler.add_summaries(e_dev.summaries, global_step)
 
-        #     if config.dump_eval:
-        #         graph_handler.dump_eval(e_dev)
-        #     if config.dump_answer:
-        #         graph_handler.dump_answer(e_dev)
+            if config.dump_eval:
+                graph_handler.dump_eval(e_dev)
+            if config.dump_answer:
+                graph_handler.dump_answer(e_dev)
 
-        if global_step % config.save_period != 0:
-            graph_handler.save(sess, global_step=global_step)
+        # if global_step % config.save_period != 0:
+        #     graph_handler.save(sess, global_step=global_step)
 
 
 def _test(config):

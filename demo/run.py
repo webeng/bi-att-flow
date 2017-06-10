@@ -7,8 +7,14 @@ app = Flask(__name__)
 #shared = json.load(open("./../data/squad/shared_test.json", "r"))
 #data = json.load(open("./../data/squad/data_test.json", "r"))
 
-shared = json.load(open("./inter_single/shared_dev.json", "r"))
-data = json.load(open("./inter_single/data_dev.json", "r"))
+# shared = json.load(open("./inter_single/shared_dev.json", "r"))
+# data = json.load(open("./inter_single/data_dev.json", "r"))
+
+shared = json.load(open("./inter_single/shared_specifiedby_train.json", "r"))
+data = json.load(open("./inter_single/data_specifiedby_train.json", "r"))
+
+print(shared.keys())
+print(data.keys())
 
 context = [[x for x in xy] for xy in shared['p']]
 
@@ -61,26 +67,38 @@ article_titles = [
     "United_Methodist_Church",
     "French_and_Indian_WarForce"
 ]
+
 # Store questions in a similar data structure like contexts
 context_questions = {}
+context_questions_answers = {}
 question_index = 0
+
+# print(data['q'][1])
+# print(data['answerss'][1])
+
 for article_idx, paragraph_idx in data['*p']:
 
     try:
         context_questions[article_idx]
+        context_questions_answers[article_idx]
     except KeyError:
         context_questions[article_idx] = {}
+        context_questions_answers[article_idx] = {}
 
     try:
         context_questions[article_idx][paragraph_idx][0]
+        context_questions_answers[article_idx][paragraph_idx][0]
     except KeyError:
         context_questions[article_idx][paragraph_idx] = []
+        context_questions_answers[article_idx][paragraph_idx] = []
 
     context_questions[article_idx][paragraph_idx].append(data['q'][question_index])
+    context_questions_answers[article_idx][paragraph_idx].append(list(set(data['answerss'][question_index])))
     question_index += 1
 
 inference = Inference()
-
+# print(context_questions_answers)
+article_titles = context_questions.keys()
 @app.route('/')
 def main():
     return render_template('index.html',
@@ -88,7 +106,8 @@ def main():
         context=context,
         titles=article_titles,
         num_pairs=len(article_titles),
-        context_questions=json.dumps(context_questions)
+        context_questions=json.dumps(context_questions),
+        context_questions_answerss=json.dumps(context_questions_answers)
     )
 
 @app.route('/submit', methods=['POST'])
