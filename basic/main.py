@@ -11,8 +11,8 @@ import numpy as np
 
 from basic.evaluator import ForwardEvaluator, MultiGPUF1Evaluator
 from basic.graph_handler import GraphHandler
-from basic.model import get_multi_gpu_models
-# from basic.model_fair import get_multi_gpu_models
+# from basic.model import get_multi_gpu_models
+from basic.model_fair import get_multi_gpu_models
 from basic.trainer import MultiGPUTrainer
 from basic.read_data import read_data, get_squad_data_filter, update_config
 
@@ -66,10 +66,10 @@ def _train(config):
     data_filter = get_squad_data_filter(config)
     # train_data = read_data(config, 'train', config.load, data_filter=data_filter)
     # dev_data = read_data(config, 'dev', True, data_filter=data_filter)
-    train_data = read_data(config, 'specifiedby_train', config.load, data_filter=data_filter)
-    dev_data = read_data(config, 'specifiedby_dev', True, data_filter=data_filter)
-    # train_data = read_data(config, 'dev_short', config.load, data_filter=data_filter)
-    # dev_data = read_data(config, 'dev_short', True, data_filter=data_filter)
+    # train_data = read_data(config, 'specifiedby_train', config.load, data_filter=data_filter)
+    # dev_data = read_data(config, 'specifiedby_dev', True, data_filter=data_filter)
+    train_data = read_data(config, 'dev_short', config.load, data_filter=data_filter)
+    dev_data = read_data(config, 'dev_short', True, data_filter=data_filter)
     # train_data = read_data(config, 'dev', config.load, data_filter=data_filter)
     # dev_data = read_data(config, 'dev', True, data_filter=data_filter)
     update_config(config, [train_data, dev_data])
@@ -127,8 +127,8 @@ def _train(config):
             graph_handler.add_summary(summary, global_step)
 
         # occasional saving
-        # if global_step % config.save_period == 0:
-        #     graph_handler.save(sess, global_step=global_step)
+        if global_step % config.save_period == 0:
+            graph_handler.save(sess, global_step=global_step)
 
         if not config.eval:
             continue

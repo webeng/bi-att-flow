@@ -13,8 +13,8 @@ import pickle
 import boto3
 from boto3.session import Session
 
-session = Session(aws_access_key_id='AKIAJJABZMFEQWGHCKFA',
-        aws_secret_access_key='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',
+session = Session(aws_access_key_id='AKIAJZWSJAMIEHNABX5Q',
+        aws_secret_access_key='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',
         region_name='eu-west-1')
 
 s3 = session.resource('s3', use_ssl=False, verify=False)
